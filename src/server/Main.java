@@ -1,7 +1,9 @@
 package server;
 
-public class Main {
-    static void main() {
+import java.io.IOException;
 
+public class Main {
+    static void main() throws IOException {
+        new UI();
     }
 }

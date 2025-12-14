@@ -1,7 +1,9 @@
 package client;
 
+import java.io.IOException;
+
 public class Main {
-    static void main() {
+    static void main() throws IOException {
         new UI();
     }
 }
