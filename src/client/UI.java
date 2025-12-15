@@ -1,11 +1,14 @@
 package client;
 
 import javax.swing.*;
+import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.net.Socket;
+import java.io.DataInputStream;
+import java.io.IOException;
+import java.util.List;
 
-public class UI extends JFrame{
+public class UI extends JFrame {
     private JTextField gameIpInput;
     private JTextField gamePortInput;
     private JPanel gamePortIpArea;
@@ -26,9 +29,21 @@ public class UI extends JFrame{
     private JPanel main;
     private JButton connectionButton;
     private JLabel gameStatusLabel;
+    private JLabel labelA1;
+    private JLabel labelA2;
+    private JLabel labelA3;
+    private JLabel labelB1;
+    private JLabel labelB2;
+    private JLabel labelB3;
+    private JLabel labelC1;
+    private JLabel labelC2;
+    private JLabel labelC3;
+    private JLabel playerId;
 
-    private Socket connection;
-    private boolean connected;
+    ClientConnection cs = new ClientConnection();
+    List<Integer> card;
+    boolean waitingServerStart;
+    boolean inGame;
 
     public UI() {
         //frame configuration
@@ -39,23 +54,25 @@ public class UI extends JFrame{
         setVisible(true);
 
         //connection configuration
-        connected = false;
+        waitingServerStart = false;
+        inGame = false;
         connectionButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
                 try {
-                    if (connected) {
-                        connection = null;
-                        connected = false;
-                        connectionButton.setText("Conectar");
-                        gameStatusLabel.setText("Desconectado");
-                    } else {
-                        String ip = gameIpInput.getText();
-                        int port = Integer.parseInt(gamePortInput.getText());
-                        connection = new Socket(ip, port);
-                        connected = true;
+                    if (!cs.isConnected()) {
+                        cs.connect(gameIpInput.getText(), Integer.parseInt(gamePortInput.getText()));
+                        setInput(false);
+                        associatePlayer();
+                        startWaiting();
                         connectionButton.setText("Desconectar");
-                        gameStatusLabel.setText("Conectado: " + ip + "/" + port);
+                        gameStatusLabel.setText("Conectado");
+                    } else {
+                        exitServer();
+                        cs.disconnect();
+                        setInput(true);
+                        connectionButton.setText("Conectar");
+                        gameStatusLabel.setText("Jogo cancelado pelo cliente");
                     }
                 }catch (Exception ex)
                 {
@@ -63,5 +80,102 @@ public class UI extends JFrame{
                 }
             }
         });
+    }
+
+    void startWaiting() throws IOException {
+        waitingServerStart = true;
+        
+        Thread t = new Thread(this::waiting);
+        t.start();
+    }
+
+    void waiting(){
+        try{
+            configureCard();
+            inGame = false;
+            connectionButton.setFocusable(true);
+            connectionButton.setEnabled(true);
+            setInput(true);
+            waitingServerStart = true;
+
+            int aux;
+            DataInputStream in = new DataInputStream(cs.getConnection().getInputStream());
+
+            aux = in.readInt();
+            // 1337 is the code for the game starting
+            if(aux == 1337){
+                inGame = true;
+                waitingServerStart = false;
+                gameStatusLabel.setText("O jogo foi iniciado");
+                setInput(false);
+                connectionButton.setFocusable(false);
+                connectionButton.setEnabled(false);
+                startReceivingNumbers();
+            }
+
+        }catch (IOException e){
+            System.out.print(e.getMessage() + "\n");
+        }
+    }
+
+    void startReceivingNumbers() throws IOException {
+        while (inGame){
+            int aux;
+            DataInputStream in = new DataInputStream(cs.getConnection().getInputStream());
+            aux = in.readInt();
+
+            //if the code receivied is 1338 the game is declared ended
+            if(aux == 1338){
+                gameStatusLabel.setText("O servidor encerrou o jogo");
+                waiting();
+                return;
+            }
+
+            gameStatusLabel.setText("Número " + aux + " selecionado");
+
+            if(card.contains(aux)){
+                int cardCount = 0;
+                for(int i = 0; i < bingoCard.getComponentCount(); i++){
+                    Component c = bingoCard.getComponent(i);
+                    if(c instanceof JPanel){
+                        JLabel l = (JLabel) ((JPanel) c).getComponent(0);
+                        int labelValue = Integer.parseInt(l.getText());
+                        if(labelValue == aux){
+                            ((JPanel) c).setBackground(Color.YELLOW);
+                        }
+                        cardCount++;
+                    }
+                }
+            }
+        }
+    }
+
+    private void exitServer() throws IOException {
+        cs.sendData(-1);
+    }
+
+    private void associatePlayer() throws IOException {
+        int id = cs.receiveInt();
+        playerId.setText("Jogador " + id);
+    }
+
+    private void configureCard() throws IOException {
+        card = cs.receiveArrayData();
+        int cardCount = 0;
+        for(int i = 0; i < bingoCard.getComponentCount(); i++){
+            Component c = bingoCard.getComponent(i);
+            if(c instanceof JPanel){
+                JLabel l = (JLabel) ((JPanel) c).getComponent(0);
+                l.setText(String.valueOf(card.get(cardCount)));
+                cardCount++;
+            }
+        }
+    }
+
+    private void setInput(boolean b){
+        gameIpInput.setFocusable(b);
+        gameIpInput.setEditable(b);
+        gamePortInput.setFocusable(b);
+        gamePortInput.setEditable(b);
     }
 }

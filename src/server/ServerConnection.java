@@ -3,15 +3,17 @@ package server;
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 public class ServerConnection {
     private ServerStatus status;
-    private boolean receiving;
+    private volatile boolean receiving;
+    private ConnectionListener listener;
     private int port;
     private ServerSocket ss;
     private List<Socket> connectedClients;
+    private List<Integer> clientsIds;
 
     enum ServerStatus{
         RECEIVING_CONNECTIONS,
@@ -23,50 +25,90 @@ public class ServerConnection {
     ServerConnection() throws IOException {
         receiving = false;
         status = ServerStatus.WAITING_CONFIGURATION;
-        ss = new ServerSocket();
-        connectedClients = new ArrayList<>();
+        connectedClients = new CopyOnWriteArrayList<>();
     }
 
-    void startReceiving(int port){
-        status = ServerStatus.STARTING_SERVER;
-        Thread t = new Thread(this::receivingConnections);
+    void startReceiving(int port) throws IOException {
+        ss = new ServerSocket(port);
         this.port = port;
         receiving = true;
+        status = ServerStatus.STARTING_SERVER;
+
+        Thread t = new Thread(this::receivingConnections);
         t.start();
+    }
+
+    void sendDataArrayTo(int connectionIndex, List<Integer> data) throws IOException {
+        Socket s = connectedClients.get(connectionIndex);
+
+        DataOutputStream out = new DataOutputStream(s.getOutputStream());
+
+        out.writeInt(data.size());
+
+        for (int value : data) {
+            out.writeInt(value);
+        }
+        out.flush();
+    }
+
+    int getConnectionsCount(){
+        return connectedClients.size();
     }
 
     void receivingConnections() {
         try{
-            if(ss.getLocalPort() != this.port) {
-                ss = new ServerSocket(port);
-            }
-
-            status = ServerStatus.RECEIVING_CONNECTIONS;
+            Socket s;
             while (receiving){
-                Socket s;
+                status = ServerStatus.RECEIVING_CONNECTIONS;
                 s = ss.accept();
-                if(receiving)
-                {
-                    System.out.println("connected from:  " + s.getPort() + "\n");
-                    connectedClients.add(s);
-                }
+                connectedClients.add(s);
+
+                listener.onClientConnected(s);
+                startWaitingForMessages(s);
             }
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            if(!receiving) {
+                status = ServerStatus.WAITING_CONFIGURATION;
+            }else{
+                System.out.println(e.getMessage());
+                status = ServerStatus.ERROR;
+            }
         }
     }
 
-    void broadcastData(DataOutputStream data)
-    {
-
+    void startWaitingForMessages(Socket s){
+        Runnable rn = new ClientMessageManager(s, listener);
+        new Thread(rn).start();
     }
 
-    void stopReceiving(){
+    void removeClient(Socket s) throws IOException {
+        for(Socket so : connectedClients){
+            if(so.equals(s)){
+                so.close();
+                connectedClients.remove(so);
+            }
+        }
+    }
+
+    void broadcastData(int data) throws IOException {
+        for(Socket s : connectedClients){
+            DataOutputStream out = new DataOutputStream(s.getOutputStream());
+            out.writeInt(data);
+            out.flush();
+        }
+    }
+
+    void stopReceiving() throws IOException {
         receiving = false;
+        ss.close();
         status = ServerStatus.WAITING_CONFIGURATION;
     }
 
     ServerStatus getStatus(){
         return status;
+    }
+
+    public void setListener(ConnectionListener listener) {
+        this.listener = listener;
     }
 }
