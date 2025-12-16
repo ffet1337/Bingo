@@ -152,8 +152,8 @@ public class UI extends JFrame implements ConnectionListener {
                     if (serverIpInput.getText().equals("127.0.0.1")) {
                         Enumeration<NetworkInterface> interfaces =
                                 NetworkInterface.getNetworkInterfaces();
-
-                        while (interfaces.hasMoreElements()) {
+                        boolean found = false;
+                        while (interfaces.hasMoreElements() && !found) {
                             NetworkInterface ni = interfaces.nextElement();
 
                             // ignora interfaces desligadas ou loopback
@@ -166,6 +166,7 @@ public class UI extends JFrame implements ConnectionListener {
 
                                 if (addr instanceof Inet4Address) {
                                    serverIpInput.setText(addr.getHostAddress());
+                                   found = true;
                                 }
                             }
                         }

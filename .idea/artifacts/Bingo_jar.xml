@@ -3,6 +3,7 @@
     <output-path>$PROJECT_DIR$/out/artifacts/Bingo_jar</output-path>
     <root id="archive" name="Bingo.jar">
       <element id="module-output" name="Bingo" />
+      <element id="extracted-dir" path="$APPLICATION_HOME_DIR$/lib/forms_rt.jar" path-in-jar="/" />
     </root>
   </artifact>
 </component>

@@ -5,7 +5,6 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
-import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.util.ArrayList;
 import java.util.List;
@@ -23,9 +22,9 @@ public class ClientConnection {
     }
 
     void connect(String ip, int port) throws SocketTimeoutException, IOException {
-        Socket s = new Socket();
+        connection = new Socket();
         try{
-            s.connect(new InetSocketAddress(ip, port), 3000); // 3 segundos
+            connection.connect(new InetSocketAddress(ip, port), 3000); // 3 segundos
         }catch (SocketTimeoutException e){
             throw new SocketTimeoutException("Tempo esgotado, não conseguiu conectar");
         }
@@ -67,9 +66,11 @@ public class ClientConnection {
     }
 
     public void sendData(int data) throws IOException {
-        DataOutputStream out = new DataOutputStream(connection.getOutputStream());
-        out.writeInt(data);
-        out.flush();
+        if(connection != null){
+            DataOutputStream out = new DataOutputStream(connection.getOutputStream());
+            out.writeInt(data);
+            out.flush();
+        }
     }
 
     public Socket getConnection() {

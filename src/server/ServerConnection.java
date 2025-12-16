@@ -106,7 +106,9 @@ public class ServerConnection {
 
     void stopReceiving() throws IOException {
         receiving = false;
-        ss.close();
+        if(ss != null){
+            ss.close();
+        }
         status = ServerStatus.WAITING_CONFIGURATION;
     }
 

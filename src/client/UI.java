@@ -94,7 +94,9 @@ public class UI extends JFrame {
                 System.out.println("Executando tarefas antes de fechar o cliente...");
 
                 try {
-                    cs.sendData(-1);
+                    if(cs != null){
+                        cs.sendData(-1);
+                    }
                 } catch (IOException ex) {
                     System.out.println("Não foi possivel desconectar antes de fechar o client");;
                 }
