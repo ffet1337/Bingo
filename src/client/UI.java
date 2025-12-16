@@ -91,7 +91,6 @@ public class UI extends JFrame {
 
     void waiting(){
         try{
-            configureCard();
             inGame = false;
             connectionButton.setFocusable(true);
             connectionButton.setEnabled(true);
@@ -104,6 +103,7 @@ public class UI extends JFrame {
             aux = in.readInt();
             // 1337 is the code for the game starting
             if(aux == 1337){
+                configureCard();
                 inGame = true;
                 waitingServerStart = false;
                 gameStatusLabel.setText("O jogo foi iniciado");
@@ -111,6 +111,13 @@ public class UI extends JFrame {
                 connectionButton.setFocusable(false);
                 connectionButton.setEnabled(false);
                 startReceivingNumbers();
+            }
+
+            if(aux == 1339){
+                waitingServerStart = false;
+                cs.disconnect();
+                connectionButton.setText("Connectar");
+                gameStatusLabel.setText("O server cancelou a conexão");
             }
 
         }catch (IOException e){
@@ -165,6 +172,7 @@ public class UI extends JFrame {
         for(int i = 0; i < bingoCard.getComponentCount(); i++){
             Component c = bingoCard.getComponent(i);
             if(c instanceof JPanel){
+                ((JPanel) c).setBackground(Color.WHITE);
                 JLabel l = (JLabel) ((JPanel) c).getComponent(0);
                 l.setText(String.valueOf(card.get(cardCount)));
                 cardCount++;

@@ -22,11 +22,11 @@ public class ClientMessageManager implements Runnable{
             int data = in.readInt();
 
             if(data == -1){
-                System.out.println("client desconenctoui");
+                System.out.println("client desconenctou");
                 listener.onClientDisconnected(s);
             }
         }catch (IOException e){
-            e.printStackTrace();
+            System.out.println("O servidor perdeu a conexão no runnable");
         }
 
     }

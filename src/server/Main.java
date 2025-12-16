@@ -3,7 +3,7 @@ package server;
 import java.io.IOException;
 
 public class Main {
-    static void main() throws IOException {
+    public static void main(String[] args) throws IOException {
         new UI();
     }
 }

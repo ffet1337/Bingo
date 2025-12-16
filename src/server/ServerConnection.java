@@ -90,6 +90,11 @@ public class ServerConnection {
         }
     }
 
+    void removeClient(int i) throws IOException {
+        Socket s = connectedClients.remove(i);
+        s.close();
+    }
+
     void broadcastData(int data) throws IOException {
         for(Socket s : connectedClients){
             DataOutputStream out = new DataOutputStream(s.getOutputStream());

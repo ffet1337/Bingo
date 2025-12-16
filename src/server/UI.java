@@ -55,6 +55,7 @@ public class UI extends JFrame implements ConnectionListener {
         add(mainPanel);
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
+        setGameInput(false);
         pack();
         setVisible(true);
 
@@ -66,7 +67,22 @@ public class UI extends JFrame implements ConnectionListener {
         serverStartButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                serverStart();
+                try {
+                    if (sc.getStatus() == ServerConnection.ServerStatus.WAITING_CONFIGURATION) {
+                        serverStart();
+                    }else if (sc.getStatus() == ServerConnection.ServerStatus.RECEIVING_CONNECTIONS) {
+                        serverStop();
+                    }
+                }
+                catch (NumberFormatException ex1){
+                    serverStatus.setText("Porta inválida, use numeros");
+                }
+                catch (IllegalArgumentException ex2){
+                    serverStatus.setText("Porta inválida, fora do range");
+                }
+                catch (IOException ex3) {
+                    serverStatus.setText("Erro no servidor");
+                }
             }
         });
 
@@ -119,38 +135,50 @@ public class UI extends JFrame implements ConnectionListener {
             }
         });
         sc.setListener(this);
+        serverRandonPortButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                int porta = 49152 + (int)(Math.random() * (65535 - 49152 + 1));
+                serverPortInput.setText(String.valueOf(porta));
+            }
+        });
     }
 
-    private void serverStart(){
-        try {
-            if (sc.getStatus() == ServerConnection.ServerStatus.WAITING_CONFIGURATION) {
-                sc.startReceiving(Integer.parseInt(serverPortInput.getText()));
-                serverPortInput.setFocusable(false);
-                serverPortInput.setEditable(false);
-                serverStartButton.setText("Parar");
-                serverStatus.setText("Recebendo Conexões");
-                game = new Bingo();
-            }else if (sc.getStatus() == ServerConnection.ServerStatus.RECEIVING_CONNECTIONS) {
-                sc.stopReceiving();
-                serverPortInput.setFocusable(true);
-                serverPortInput.setEditable(true);
-                serverStartButton.setText("Iniciar");
-                serverStatus.setText("Esperando configuração");
-                game = null;
-            }
+    private void serverStart() throws IOException {
+        sc.startReceiving(Integer.parseInt(serverPortInput.getText()));
+        serverPortInput.setFocusable(false);
+        serverPortInput.setEditable(false);
+        serverStartButton.setText("Parar");
+        serverStatus.setText("Recebendo Conexões");
+
+        setBingoControls(false);
+    }
+
+    private void serverStop() throws IOException {
+        sc.broadcastData(1339);
+        for(int i = sc.getConnectionsCount() - 1; i >= 0; i--){
+            sc.removeClient(i);
         }
-        catch (NumberFormatException ex1){
-            serverStatus.setText("Porta inválida, use numeros");
-        }
-        catch (IllegalArgumentException ex2){
-            serverStatus.setText("Porta inválida, fora do range");
-        }
-        catch (IOException ex3) {
-            serverStatus.setText("Erro no servidor");
-        }
+        connectedIdsTrack.clear();
+        socketInfoTrack.clear();
+        numbersListModel.clear();
+        playersListModel.clear();
+
+        sc.stopReceiving();
+        serverPortInput.setFocusable(true);
+        serverPortInput.setEditable(true);
+        setGameInput(false);
+        serverStartButton.setText("Iniciar");
+        serverStatus.setText("Esperando configuração");
+
+        setBingoControls(false);
+        game = null;
     }
 
     private void bingoStart() throws IOException {
+        sc.broadcastData(1337);
+        game = new Bingo();
+
         List<Integer> hold;
         for(int i = 0; i < sc.getConnectionsCount(); i++){
             game.addPlayer(String.valueOf(connectedIdsTrack.get(i)));
@@ -158,23 +186,32 @@ public class UI extends JFrame implements ConnectionListener {
             sc.sendDataArrayTo(i, hold);
         }
 
-        sc.broadcastData(1337);
+        setBingoControls(true);
         inGame = true;
     }
 
     private void bingoStop() throws IOException {
         sc.broadcastData(1338);
+        setBingoControls(false);
         inGame = false;
+
+        game = null;
     }
 
     private void selectNumber(int number) throws IOException {
         game.addSelectedNumber(number);
+        numbersListModel.addElement(String.valueOf(number));
         sc.broadcastData(number);
     }
 
     @Override
     public void onClientConnected(Socket s) throws IOException {
-        playersListModel.addElement(s.getRemoteSocketAddress().toString());
+        if(socketInfoTrack.isEmpty()){
+            bingoStartButton.setEnabled(true);
+            setBingoControls(false);
+        }
+
+        playersListModel.addElement("Jogador " + idTrack + " :" + s.getRemoteSocketAddress().toString());
 
         DataOutputStream out = new DataOutputStream(s.getOutputStream());
 
@@ -190,18 +227,25 @@ public class UI extends JFrame implements ConnectionListener {
 
     @Override
     public void onClientDisconnected(Socket s) throws IOException {
-        playersListModel.removeElement(s.getRemoteSocketAddress().toString());
-
+        setGameInput(false);
+        int idHold = -1;
+        String socketHold = "";
         for(int i = 0; i < socketInfoTrack.size(); i++){
             if(socketInfoTrack.get(i).equals(s.getRemoteSocketAddress().toString())){
-                connectedIdsTrack.remove(i);
-                socketInfoTrack.remove(i);
+                idHold = connectedIdsTrack.remove(i);
+                socketHold = socketInfoTrack.remove(i);
                 break;
             }
         }
 
+        playersListModel.removeElement("Jogador " + idHold + " :" + socketHold);
+
         sc.removeClient(s);
-        gameStatus.setText("Cliente " + s.getRemoteSocketAddress().toString() + " saiu do jogo");
+        gameStatus.setText("Cliente " + s.getRemoteSocketAddress().toString() + " saiu do jogo: " + "Jogador " + idHold);
+
+        if(socketInfoTrack.isEmpty()){
+            setGameInput(false);
+        }
     }
 
     private void setServerInput(boolean b){
@@ -210,5 +254,33 @@ public class UI extends JFrame implements ConnectionListener {
 
         serverPortInput.setFocusable(b);
         serverPortInput.setEditable(b);
+
+        serverRandonPortButton.setEnabled(b);
+        serverRandonPortButton.setFocusable(b);
+    }
+
+    private void setGameInput(boolean b){
+        bingoNumberInput.setEditable(b);
+        bingoNumberInput.setFocusable(b);
+
+        bingoStartButton.setFocusable(b);
+        bingoStartButton.setEnabled(b);
+
+        bingoRandomNumberButton.setEnabled(b);
+        bingoRandomNumberButton.setFocusable(b);
+
+        bingoSendButton.setEnabled(b);
+        bingoSendButton.setFocusable(b);
+    }
+
+    private void setBingoControls(boolean b){
+        bingoSendButton.setEnabled(b);
+        bingoSendButton.setFocusable(b);
+
+        bingoRandomNumberButton.setFocusable(b);
+        bingoRandomNumberButton.setEnabled(b);
+
+        bingoNumberInput.setFocusable(b);
+        bingoNumberInput.setEditable(b);
     }
 }
