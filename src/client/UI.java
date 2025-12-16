@@ -4,8 +4,11 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 import java.io.DataInputStream;
 import java.io.IOException;
+import java.net.SocketTimeoutException;
 import java.util.List;
 
 public class UI extends JFrame {
@@ -61,7 +64,11 @@ public class UI extends JFrame {
             public void actionPerformed(ActionEvent e) {
                 try {
                     if (!cs.isConnected()) {
-                        cs.connect(gameIpInput.getText(), Integer.parseInt(gamePortInput.getText()));
+                        try{
+                            cs.connect(gameIpInput.getText(), Integer.parseInt(gamePortInput.getText()));
+                        }catch (SocketTimeoutException ex){
+                            gameStatusLabel.setText(ex.getMessage());
+                        }
                         setInput(false);
                         associatePlayer();
                         startWaiting();
@@ -77,6 +84,19 @@ public class UI extends JFrame {
                 }catch (Exception ex)
                 {
                     gameStatusLabel.setText("Conexão falhou");
+                }
+            }
+        });
+
+        addWindowListener(new WindowAdapter() {
+            @Override
+            public void windowClosing(WindowEvent e) {
+                System.out.println("Executando tarefas antes de fechar o cliente...");
+
+                try {
+                    cs.sendData(-1);
+                } catch (IOException ex) {
+                    System.out.println("Não foi possivel desconectar antes de fechar o client");;
                 }
             }
         });

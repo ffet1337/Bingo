@@ -3,10 +3,13 @@ package server;
 import javax.swing.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 import java.io.DataOutputStream;
 import java.io.IOException;
-import java.net.Socket;
+import java.net.*;
 import java.util.ArrayList;
+import java.util.Enumeration;
 import java.util.List;
 
 public class UI extends JFrame implements ConnectionListener {
@@ -92,12 +95,12 @@ public class UI extends JFrame implements ConnectionListener {
                 try {
                     if(!inGame){
                         bingoStart();
-                        setServerInput(false);
+                        serverStartButton.setEnabled(false);
                         bingoStartButton.setText("Encerrar");
                     }
                     else{
                         bingoStop();
-                        setServerInput(true);
+                        serverStartButton.setEnabled(true);
                         bingoStartButton.setText("Iniciar");
                     }
 
@@ -142,12 +145,72 @@ public class UI extends JFrame implements ConnectionListener {
                 serverPortInput.setText(String.valueOf(porta));
             }
         });
+        serverLocalhostOption.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                try {
+                    if (serverIpInput.getText().equals("127.0.0.1")) {
+                        Enumeration<NetworkInterface> interfaces =
+                                NetworkInterface.getNetworkInterfaces();
+
+                        while (interfaces.hasMoreElements()) {
+                            NetworkInterface ni = interfaces.nextElement();
+
+                            // ignora interfaces desligadas ou loopback
+                            if (!ni.isUp() || ni.isLoopback())
+                                continue;
+
+                            Enumeration<InetAddress> addresses = ni.getInetAddresses();
+                            while (addresses.hasMoreElements()) {
+                                InetAddress addr = addresses.nextElement();
+
+                                if (addr instanceof Inet4Address) {
+                                   serverIpInput.setText(addr.getHostAddress());
+                                }
+                            }
+                        }
+                    }else{
+                        serverIpInput.setText("127.0.0.1");
+                    }
+                }catch (SocketException ex){
+                    System.out.println("Erro tentando acessar o IPV4 da maquina");
+                }
+            }
+        });
+
+        addWindowListener(new WindowAdapter() {
+            @Override
+            public void windowClosing(WindowEvent e) {
+                System.out.println("Executando tarefas antes de fechar o server...");
+
+                if(inGame){
+                    try {
+                        bingoStop();
+                    } catch (IOException ex) {
+                        System.out.println("não foi possivel encerrar o jogo antes fechar a janela");
+                    }
+                }
+
+                try {
+                    serverStop();
+                } catch (IOException ex) {
+                    System.out.println("não foi possivel encerrar o servidor antes fechar a janela");
+                }
+
+                dispose();
+                System.exit(0);
+            }
+        });
     }
 
     private void serverStart() throws IOException {
         sc.startReceiving(Integer.parseInt(serverPortInput.getText()));
-        serverPortInput.setFocusable(false);
-        serverPortInput.setEditable(false);
+
+        serverIpInput.setEnabled(false);
+        serverPortInput.setEnabled(false);
+        serverRandonPortButton.setEnabled(false);
+        serverLocalhostOption.setEnabled(false);
+
         serverStartButton.setText("Parar");
         serverStatus.setText("Recebendo Conexões");
 
@@ -165,8 +228,12 @@ public class UI extends JFrame implements ConnectionListener {
         playersListModel.clear();
 
         sc.stopReceiving();
-        serverPortInput.setFocusable(true);
-        serverPortInput.setEditable(true);
+
+        serverIpInput.setEnabled(true);
+        serverPortInput.setEnabled(true);
+        serverRandonPortButton.setEnabled(true);
+        serverLocalhostOption.setEnabled(true);
+
         setGameInput(false);
         serverStartButton.setText("Iniciar");
         serverStatus.setText("Esperando configuração");
@@ -194,6 +261,7 @@ public class UI extends JFrame implements ConnectionListener {
         sc.broadcastData(1338);
         setBingoControls(false);
         inGame = false;
+        numbersListModel.clear();
 
         game = null;
     }
@@ -227,7 +295,6 @@ public class UI extends JFrame implements ConnectionListener {
 
     @Override
     public void onClientDisconnected(Socket s) throws IOException {
-        setGameInput(false);
         int idHold = -1;
         String socketHold = "";
         for(int i = 0; i < socketInfoTrack.size(); i++){
@@ -257,6 +324,8 @@ public class UI extends JFrame implements ConnectionListener {
 
         serverRandonPortButton.setEnabled(b);
         serverRandonPortButton.setFocusable(b);
+
+        serverLocalhostOption.setEnabled(b);
     }
 
     private void setGameInput(boolean b){

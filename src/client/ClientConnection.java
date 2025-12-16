@@ -3,7 +3,10 @@ package client;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.net.SocketException;
+import java.net.SocketTimeoutException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -19,8 +22,13 @@ public class ClientConnection {
         connected = false;
     }
 
-    void connect(String ip, int port) throws IOException {
-        connection = new Socket(ip, port);
+    void connect(String ip, int port) throws SocketTimeoutException, IOException {
+        Socket s = new Socket();
+        try{
+            s.connect(new InetSocketAddress(ip, port), 3000); // 3 segundos
+        }catch (SocketTimeoutException e){
+            throw new SocketTimeoutException("Tempo esgotado, não conseguiu conectar");
+        }
         connected = true;
         serverIp = ip;
         serverPort = port;

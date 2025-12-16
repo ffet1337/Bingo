@@ -29,6 +29,7 @@ public class ServerConnection {
     }
 
     void startReceiving(int port) throws IOException {
+
         ss = new ServerSocket(port);
         this.port = port;
         receiving = true;
