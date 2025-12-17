@@ -4,7 +4,7 @@ programação:
 Gustavo Carvalho
 
 relatorio:
-João Victor Uchôa
-Allyson Kevin
-Ryanderson
+João Victor Uchôa,
+Allyson Kevin,
+Ryanderson,
 Raimundo Nonato Silva
